@@ -62,7 +62,7 @@ func skipMessage(hook *core.Hook) bool {
 	case hook.Event == core.EventCustom:
 		return false
 	case skipMessageEval(hook.Message):
-		return false
+		return true
 	case skipMessageEval(hook.Title):
 		return true
 	default:
@@ -72,10 +72,13 @@ func skipMessage(hook *core.Hook) bool {
 
 func skipMessageEval(str string) bool {
 	lower := strings.ToLower(str)
+	lines := strings.Split(lower, "\n")
+	firstLine := lines[0]
+
 	switch {
-	case strings.Contains(lower, "[ci skip]"),
-		strings.Contains(lower, "[skip ci]"),
-		strings.Contains(lower, "***no_ci***"):
+	case strings.Contains(firstLine, "[ci skip]"),
+		strings.Contains(firstLine, "[skip ci]"),
+		strings.Contains(firstLine, "***no_ci***"):
 		return true
 	default:
 		return false
