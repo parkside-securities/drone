@@ -153,9 +153,21 @@ func Test_skipMessage(t *testing.T) {
 			want:    true,
 		},
 		{
+			event: "push",
+			message: `update readme
+                      [skip ci] second line`,
+			want: false,
+		},
+		{
 			event:   "pull_request",
 			message: "update readme  [CI SKIP]",
 			want:    true,
+		},
+		{
+			event: "pull_request",
+			message: `update readme
+                      [skip ci] second line`,
+			want: false,
 		},
 		// skip when title contains [CI SKIP]
 
