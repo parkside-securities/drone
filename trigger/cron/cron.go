@@ -46,11 +46,14 @@ type Scheduler struct {
 
 // Start starts the cron scheduler.
 func (s *Scheduler) Start(ctx context.Context, dur time.Duration) error {
+	ticker := time.NewTicker(dur)
+	defer ticker.Stop()
+
 	for {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
-		case <-time.After(dur):
+		case <-ticker.C:
 			s.run(ctx)
 		}
 	}
@@ -75,6 +78,8 @@ func (s *Scheduler) run(ctx context.Context) error {
 		logger.Error("cron: cannot list pending jobs")
 		return err
 	}
+
+	logrus.Debugf("cron: found %d pending jobs", len(jobs))
 
 	for _, job := range jobs {
 		// jobs can be manually disabled in the user interface,
@@ -126,6 +131,11 @@ func (s *Scheduler) run(ctx context.Context) error {
 			continue
 		}
 
+		if repo.Active == false {
+			logger.Traceln("cron: skip inactive repository")
+			continue
+		}
+
 		// TODO(bradrydzewski) we may actually need to query the branch
 		// first to get the sha, and then query the commit. This works fine
 		// with github and gitlab, but may not work with other providers.
@@ -158,6 +168,14 @@ func (s *Scheduler) run(ctx context.Context) error {
 			Cron:         job.Name,
 			Sender:       commit.Author.Login,
 		}
+
+		logger.WithFields(
+			logrus.Fields{
+				"cron":   job.Name,
+				"repo":   repo.Slug,
+				"branch": repo.Branch,
+				"sha":    commit.Sha,
+			}).Warnln("cron: trigger build")
 
 		_, err = s.trigger.Trigger(ctx, repo, hook)
 		if err != nil {

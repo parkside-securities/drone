@@ -12,42 +12,48 @@ import (
 
 	"github.com/drone/drone-go/drone"
 	"github.com/drone/drone-go/plugin/config"
+
 	"github.com/drone/drone/core"
 )
 
 // Global returns a configuration service that fetches the yaml
 // configuration from a remote endpoint.
-func Global(endpoint, signer string, skipVerify bool) core.ConfigService {
+func Global(endpoint, signer string, skipVerify bool, timeout time.Duration) core.ConfigService {
+	if endpoint == "" {
+		return new(global)
+	}
 	return &global{
-		endpoint:   endpoint,
-		secret:     signer,
-		skipVerify: skipVerify,
+		client: config.Client(
+			endpoint,
+			signer,
+			skipVerify,
+		),
+		timeout: timeout,
 	}
 }
 
 type global struct {
-	endpoint   string
-	secret     string
-	skipVerify bool
+	client config.Plugin
+	timeout time.Duration
 }
 
 func (g *global) Find(ctx context.Context, in *core.ConfigArgs) (*core.Config, error) {
-	if g.endpoint == "" {
+	if g.client == nil {
 		return nil, nil
 	}
 	// include a timeout to prevent an API call from
 	// hanging the build process indefinitely. The
-	// external service must return a request within
-	// one minute.
-	ctx, cancel := context.WithTimeout(ctx, time.Minute)
+	// external service must return a response within
+	// the configured timeout (default 1m).
+	ctx, cancel := context.WithTimeout(ctx, g.timeout)
 	defer cancel()
 
 	req := &config.Request{
 		Repo:  toRepo(in.Repo),
 		Build: toBuild(in.Build),
 	}
-	client := config.Client(g.endpoint, g.secret, g.skipVerify)
-	res, err := client.Find(ctx, req)
+
+	res, err := g.client.Find(ctx, req)
 	if err != nil {
 		return nil, err
 	}

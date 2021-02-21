@@ -83,6 +83,7 @@ func HandleRetry(
 			AuthorAvatar: prev.AuthorAvatar,
 			Deployment:   prev.Deploy,
 			DeploymentID: prev.DeployID,
+			Debug:        r.FormValue("debug") == "true",
 			Cron:         prev.Cron,
 			Sender:       prev.Sender,
 			Params:       map[string]string{},
@@ -92,10 +93,16 @@ func HandleRetry(
 			if key == "access_token" {
 				continue
 			}
+			if key == "debug" {
+				continue
+			}
 			if len(value) == 0 {
 				continue
 			}
 			hook.Params[key] = value[0]
+		}
+		for key, value := range prev.Params {
+			hook.Params[key] = value
 		}
 
 		result, err := triggerer.Trigger(r.Context(), repo, hook)

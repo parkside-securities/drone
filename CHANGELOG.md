@@ -5,9 +5,131 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
+### Breaking
+- removed deprecated kubernetes integration in favor of official kubernetes runner.
+- removed deprecated nomad integration in favor of official nomad runner.
+
+## [1.10.1]
+### Added
+- support for repository-level concurrency limits.
+- support for gitlab and github internal visibility on initial sync.
+
+### Fixed
+- create machine user with a custom API token.
+
+## [1.10.0]
+### Added
+- support for starlark scripts in core.
+- support for executing pipelines in debug mode.
+
+## [1.9.2]
+### Added
+- update go-scm dependency to fix
+
+## [1.9.1]
+### Added
+- support for increasing the http request timeout for extensions. [#2998](https://github.com/drone/drone/pull/2998).
+- support for skipping a pipeline if the validation extension returns an ErrSkip.
+- support for blocking a pipeline if the validation extension returns an ErrBlock.
+
+### Fixed
+- rollback endpoint should be available to users with write permission.
+- retrying a build should re-use custom build parameters from parent build.
+
+## [1.9.0] - 2020-07-12
+### Added
+- ui support for deployment list and summary.
+- ui support for promoting and rolling back builds.
+- feature flag to use static secret when signing webhooks, from @chiraggadasc.
+
+### Fixed
+- ui branch list improperly capped.
+
+### Changed
+- upgrade drone/envsubst dependency
+- upgrade drone/go-scm dependency
+
+## [1.8.1] - 2020-06-23
+### Fixed
+- support for gitea api pagination, repository sync hanging.
+
+## [1.8.0] - 2020-06-10
+### Added
+- re-assigned repository ownership when deactivating a user.
+- re-assigned repository ownership when deleting a user.
+- de-activate a repository when deleting a user if re-assignment fails.
+- de-activate a repository when deactivating a user if re-assignment fails.
+- routine to cleanup builds stuck in a pending state.
+- routine to cleanup builds stuck in a running state.
+- private mode setting requires authentication to view public repositories.
+
+### Fixed
+- canceling a build emits a sql.ErrNoRows error.
+- custom token is ignored when creating a user account via the API.
+- machine accounts with sufficient permissions can create builds via the API.
+
+### Changed
+- upgraded Go toolchain to version 1.14.4.
+
+## [1.7.0] - 2020-03-27
+### Added
+- endpoint to display the latest build by branch. [#2940](https://github.com/drone/drone/pull/2940).
+- endpoint to display the latest build by pull request. [#2940](https://github.com/drone/drone/pull/2940).
+- endpoint to display the latest build by environment. [#2940](https://github.com/drone/drone/pull/2940).
+- endpoint to delete a branch from the index. [#2940](https://github.com/drone/drone/pull/2940).
+- endpoint to delete a pull request from the index. [#2940](https://github.com/drone/drone/pull/2940).
+- endpoint to delete an environment from the index. [#2940](https://github.com/drone/drone/pull/2940).
+- page to view the latest build per branch.
+
+### Fixed
+- sync routine not executing asyncronously, being cancelled by http context.
+- sync routine should ignore gitlab subrepositories
+- convert deploy events in 0.8 yaml to promote events.
+- do not execute cron job for disabled repositories. [#2931](https://github.com/drone/drone/issues/2931).
+- remove trailing slash from gitea url to prevent oauth2 token refresh errors, by [@cmj0121](https://github.com/cmj0121). [#2920](https://github.com/drone/drone/issues/2920). 
+- disable font ligatures in build log output. [drone/drone-ui#322](https://github.com/drone/drone-ui/pull/322).
+- missing am/pm in timstamps
+
+## [1.6.5] - 2020-01-29
+### Changed
+- update version of go-scm
+- update alpine version in docker images
+- use ticker for cron jobs for more accurate timing
+
+## [1.6.4] - 2019-12-30
+### Added
+- optionally enable pprof endpoints for profiling, by [@bradrydzewski](https://github.com/bradrydzewski).
+
+## [1.6.3] - 2019-12-10
+### Fixed
+- disable caching generated yaml files by commit sha, by [@bradrydzewski](https://github.com/bradrydzewski).
+
+### Added
+- support for bitbucket skipverify, by [@toni-moreno](https://github.com/toni-moreno).
+- support for gitea skipverify, by [@toni-moreno](https://github.com/toni-moreno).
+
+## [1.6.2] - 2019-11-08
+### Added
+- support for loading license contents from env, by [@bradrydzewski](https://github.com/bradrydzewski).
+
+### Fixed
+- regression not converting legacy pipeline when using new runners, by [@bradrydzewski](https://github.com/bradrydzewski).
+
+## [1.6.1] - 2019-10-17
+### Added
+- updated autocert library in support of acme v2 protocol, by [@bradrydzewski](https://github.com/bradrydzewski).
+
+### Fixed
+- fixed nil pointer when manually adding user from api, by [@bradrydzewski](https://github.com/bradrydzewski).
+
+## [1.6.0] - 2019-10-04
 ### Added
 - added nsswitch to docker images
 - option to auto-cancel pending builds when newer build enqueued, by [@bradrydzewski](https://github.com/bradrydzewski). [#1980](https://github.com/drone/drone/issues/1980).
+- endpoint to list all repositories in the database, by [@bradrydzewski](https://github.com/bradrydzewski). [#2785](https://github.com/drone/drone/issues/2785).
+
+### Fixed
+- improve sync to handle duplicate repository names with different unique identifiers, by [@bradrydzewski](https://github.com/bradrydzewski). [#2658](https://github.com/drone/drone/issues/2658). _You can revert to the previous sync logic with DRONE_DATABASE_LEGACY_BATCH=true_.
 
 ## [1.5.1] - 2019-09-30
 ### Added
@@ -30,6 +152,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - missing cron job name in user interface, by [@bradrydzewski](https://github.com/bradrydzewski).
 - log lines not properly wrapping in user interface, by [@bradrydzewski](https://github.com/bradrydzewski).
 [#309](https://github.com/drone/drone-ui/issues/309).
+
+### Breaking
+- the server now runs in multi-machine mode by default. In order to run the server in single-machine mode (agents disabled) you must set DRONE_AGENTS_DISABLED=true.
 
 ## [1.4.0] - 2019-09-12
 ### Added

@@ -22,6 +22,7 @@ import (
 // Hook action constants.
 const (
 	ActionOpen   = "open"
+	ActionClose  = "close"
 	ActionCreate = "create"
 	ActionDelete = "delete"
 	ActionSync   = "sync"
@@ -49,6 +50,7 @@ type Hook struct {
 	AuthorAvatar string            `json:"author_avatar"`
 	Deployment   string            `json:"deploy_to"`
 	DeploymentID int64             `json:"deploy_id"`
+	Debug        bool              `json:"debug"`
 	Cron         string            `json:"cron"`
 	Sender       string            `json:"sender"`
 	Params       map[string]string `json:"params"`

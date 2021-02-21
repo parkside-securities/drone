@@ -23,11 +23,12 @@ import (
 	"github.com/drone/drone/core"
 
 	lru "github.com/hashicorp/golang-lru"
+	"github.com/sirupsen/logrus"
 )
 
 // cache key pattern used in the cache, comprised of the
 // repository slug and commit sha.
-const keyf = "%d/%s"
+const keyf = "%d|%s|%s|%s|%s|%s"
 
 // Memoize caches the conversion results for subsequent calls.
 // This micro-optimization is intended for multi-pipeline
@@ -36,7 +37,7 @@ const keyf = "%d/%s"
 func Memoize(base core.ConvertService) core.ConvertService {
 	// simple cache prevents the same yaml file from being
 	// requested multiple times in a short period.
-	cache, _ := lru.New(25)
+	cache, _ := lru.New(10)
 	return &memoize{base: base, cache: cache}
 }
 
@@ -48,25 +49,37 @@ type memoize struct {
 func (c *memoize) Convert(ctx context.Context, req *core.ConvertArgs) (*core.Config, error) {
 	// this is a minor optimization that prevents caching if the
 	// base converter is a remote converter and is disabled.
-	if remote, ok := c.base.(*remote); ok == true && remote.endpoint == "" {
+	if remote, ok := c.base.(*remote); ok == true && remote.client == nil {
 		return nil, nil
 	}
 
 	// generate the key used to cache the converted file.
-	key := fmt.Sprintf(keyf, req.Repo.ID, req.Build.After)
+	key := fmt.Sprintf(keyf,
+		req.Repo.ID,
+		req.Build.Event,
+		req.Build.Action,
+		req.Build.Ref,
+		req.Build.After,
+		req.Repo.Config,
+	)
 
-	// some source control management systems (gogs) do not provide
-	// the commit sha for tag webhooks. If no commit sha is available
-	// the ref is used.
-	if req.Build.After == "" {
-		key = fmt.Sprintf(keyf, req.Repo.ID, req.Build.Ref)
-	}
+	logger := logrus.WithField("repo", req.Repo.Slug).
+		WithField("build", req.Build.Event).
+		WithField("action", req.Build.Action).
+		WithField("ref", req.Build.Ref).
+		WithField("rev", req.Build.After).
+		WithField("config", req.Repo.Config)
+
+	logger.Trace("extension: conversion: check cache")
 
 	// check the cache for the file and return if exists.
 	cached, ok := c.cache.Get(key)
 	if ok {
+		logger.Trace("extension: conversion: cache hit")
 		return cached.(*core.Config), nil
 	}
+
+	logger.Trace("extension: conversion: cache miss")
 
 	// else convert the configuration file.
 	config, err := c.base.Convert(ctx, req)
@@ -82,7 +95,11 @@ func (c *memoize) Convert(ctx context.Context, req *core.ConvertArgs) (*core.Con
 	}
 
 	// if the configuration file was converted
-	// it is temporarily cached.
-	c.cache.Add(key, config)
+	// it is temporarily cached. Note that we do
+	// not cache if the commit sha is empty (gogs).
+	if req.Build.After != "" {
+		c.cache.Add(key, config)
+	}
+
 	return config, nil
 }

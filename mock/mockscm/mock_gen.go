@@ -80,6 +80,22 @@ func (mr *MockContentServiceMockRecorder) Find(arg0, arg1, arg2, arg3 interface{
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Find", reflect.TypeOf((*MockContentService)(nil).Find), arg0, arg1, arg2, arg3)
 }
 
+// List mocks base method
+func (m *MockContentService) List(arg0 context.Context, arg1, arg2, arg3 string, arg4 scm.ListOptions) ([]*scm.ContentInfo, *scm.Response, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "List", arg0, arg1, arg2, arg3, arg4)
+	ret0, _ := ret[0].([]*scm.ContentInfo)
+	ret1, _ := ret[1].(*scm.Response)
+	ret2, _ := ret[2].(error)
+	return ret0, ret1, ret2
+}
+
+// List indicates an expected call of List
+func (mr *MockContentServiceMockRecorder) List(arg0, arg1, arg2, arg3, arg4 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "List", reflect.TypeOf((*MockContentService)(nil).List), arg0, arg1, arg2, arg3, arg4)
+}
+
 // Update mocks base method
 func (m *MockContentService) Update(arg0 context.Context, arg1, arg2 string, arg3 *scm.ContentParams) (*scm.Response, error) {
 	m.ctrl.T.Helper()
@@ -116,6 +132,22 @@ func NewMockGitService(ctrl *gomock.Controller) *MockGitService {
 // EXPECT returns an object that allows the caller to indicate expected use
 func (m *MockGitService) EXPECT() *MockGitServiceMockRecorder {
 	return m.recorder
+}
+
+// CompareChanges mocks base method
+func (m *MockGitService) CompareChanges(arg0 context.Context, arg1, arg2, arg3 string, arg4 scm.ListOptions) ([]*scm.Change, *scm.Response, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CompareChanges", arg0, arg1, arg2, arg3, arg4)
+	ret0, _ := ret[0].([]*scm.Change)
+	ret1, _ := ret[1].(*scm.Response)
+	ret2, _ := ret[2].(error)
+	return ret0, ret1, ret2
+}
+
+// CompareChanges indicates an expected call of CompareChanges
+func (mr *MockGitServiceMockRecorder) CompareChanges(arg0, arg1, arg2, arg3, arg4 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CompareChanges", reflect.TypeOf((*MockGitService)(nil).CompareChanges), arg0, arg1, arg2, arg3, arg4)
 }
 
 // FindBranch mocks base method
@@ -337,6 +369,22 @@ func (m *MockPullRequestService) Close(arg0 context.Context, arg1 string, arg2 i
 func (mr *MockPullRequestServiceMockRecorder) Close(arg0, arg1, arg2 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Close", reflect.TypeOf((*MockPullRequestService)(nil).Close), arg0, arg1, arg2)
+}
+
+// Create mocks base method
+func (m *MockPullRequestService) Create(arg0 context.Context, arg1 string, arg2 *scm.PullRequestInput) (*scm.PullRequest, *scm.Response, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Create", arg0, arg1, arg2)
+	ret0, _ := ret[0].(*scm.PullRequest)
+	ret1, _ := ret[1].(*scm.Response)
+	ret2, _ := ret[2].(error)
+	return ret0, ret1, ret2
+}
+
+// Create indicates an expected call of Create
+func (mr *MockPullRequestServiceMockRecorder) Create(arg0, arg1, arg2 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Create", reflect.TypeOf((*MockPullRequestService)(nil).Create), arg0, arg1, arg2)
 }
 
 // CreateComment mocks base method
@@ -629,6 +677,22 @@ func (m *MockRepositoryService) ListStatus(arg0 context.Context, arg1, arg2 stri
 func (mr *MockRepositoryServiceMockRecorder) ListStatus(arg0, arg1, arg2, arg3 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListStatus", reflect.TypeOf((*MockRepositoryService)(nil).ListStatus), arg0, arg1, arg2, arg3)
+}
+
+// UpdateHook mocks base method
+func (m *MockRepositoryService) UpdateHook(arg0 context.Context, arg1, arg2 string, arg3 *scm.HookInput) (*scm.Hook, *scm.Response, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateHook", arg0, arg1, arg2, arg3)
+	ret0, _ := ret[0].(*scm.Hook)
+	ret1, _ := ret[1].(*scm.Response)
+	ret2, _ := ret[2].(error)
+	return ret0, ret1, ret2
+}
+
+// UpdateHook indicates an expected call of UpdateHook
+func (mr *MockRepositoryServiceMockRecorder) UpdateHook(arg0, arg1, arg2, arg3 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateHook", reflect.TypeOf((*MockRepositoryService)(nil).UpdateHook), arg0, arg1, arg2, arg3)
 }
 
 // MockUserService is a mock of UserService interface
