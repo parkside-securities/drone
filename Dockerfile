@@ -2,7 +2,7 @@
 # Use the following command to start the container:
 #    docker run -p 127.0.0.1:80:80 -t drone/drone
 
-FROM golang:1.13 as staging
+FROM golang:1.14.4 as staging
 
 env GOPATH=/gopath
 env GOARCH=amd64
@@ -14,10 +14,10 @@ WORKDIR /gopath/src/github.com/drone/drone
 RUN go mod vendor
 RUN sh scripts/build.sh
 
-FROM alpine:3.9 as alpine
+FROM alpine:3.11 as alpine
 RUN apk add -U --no-cache ca-certificates
 
-FROM alpine:3.9
+FROM alpine:3.11
 EXPOSE 80 443
 VOLUME /data
 
