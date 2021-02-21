@@ -16,6 +16,7 @@ package api
 
 import (
 	"net/http"
+	"os"
 
 	"github.com/drone/drone/core"
 	"github.com/drone/drone/handler/api/acl"
@@ -27,7 +28,10 @@ import (
 	"github.com/drone/drone/handler/api/queue"
 	"github.com/drone/drone/handler/api/repos"
 	"github.com/drone/drone/handler/api/repos/builds"
+	"github.com/drone/drone/handler/api/repos/builds/branches"
+	"github.com/drone/drone/handler/api/repos/builds/deploys"
 	"github.com/drone/drone/handler/api/repos/builds/logs"
+	"github.com/drone/drone/handler/api/repos/builds/pulls"
 	"github.com/drone/drone/handler/api/repos/builds/stages"
 	"github.com/drone/drone/handler/api/repos/collabs"
 	"github.com/drone/drone/handler/api/repos/crons"
@@ -78,69 +82,73 @@ func New(
 	stream core.LogStream,
 	syncer core.Syncer,
 	system *core.System,
+	transferer core.Transferer,
 	triggerer core.Triggerer,
 	users core.UserStore,
 	userz core.UserService,
 	webhook core.WebhookSender,
 ) Server {
 	return Server{
-		Builds:    builds,
-		Cron:      cron,
-		Commits:   commits,
-		Events:    events,
-		Globals:   globals,
-		Hooks:     hooks,
-		Logs:      logs,
-		License:   license,
-		Licenses:  licenses,
-		Orgs:      orgs,
-		Perms:     perms,
-		Repos:     repos,
-		Repoz:     repoz,
-		Scheduler: scheduler,
-		Secrets:   secrets,
-		Stages:    stages,
-		Steps:     steps,
-		Status:    status,
-		Session:   session,
-		Stream:    stream,
-		Syncer:    syncer,
-		System:    system,
-		Triggerer: triggerer,
-		Users:     users,
-		Userz:     userz,
-		Webhook:   webhook,
+		Builds:     builds,
+		Cron:       cron,
+		Commits:    commits,
+		Events:     events,
+		Globals:    globals,
+		Hooks:      hooks,
+		Logs:       logs,
+		License:    license,
+		Licenses:   licenses,
+		Orgs:       orgs,
+		Perms:      perms,
+		Repos:      repos,
+		Repoz:      repoz,
+		Scheduler:  scheduler,
+		Secrets:    secrets,
+		Stages:     stages,
+		Steps:      steps,
+		Status:     status,
+		Session:    session,
+		Stream:     stream,
+		Syncer:     syncer,
+		System:     system,
+		Transferer: transferer,
+		Triggerer:  triggerer,
+		Users:      users,
+		Userz:      userz,
+		Webhook:    webhook,
 	}
 }
 
 // Server is a http.Handler which exposes drone functionality over HTTP.
 type Server struct {
-	Builds    core.BuildStore
-	Cron      core.CronStore
-	Commits   core.CommitService
-	Events    core.Pubsub
-	Globals   core.GlobalSecretStore
-	Hooks     core.HookService
-	Logs      core.LogStore
-	License   *core.License
-	Licenses  core.LicenseService
-	Orgs      core.OrganizationService
-	Perms     core.PermStore
-	Repos     core.RepositoryStore
-	Repoz     core.RepositoryService
-	Scheduler core.Scheduler
-	Secrets   core.SecretStore
-	Stages    core.StageStore
-	Steps     core.StepStore
-	Status    core.StatusService
-	Session   core.Session
-	Stream    core.LogStream
-	Syncer    core.Syncer
-	System    *core.System
-	Triggerer core.Triggerer
-	Users     core.UserStore
-	Userz     core.UserService
-	Webhook   core.WebhookSender
+	Builds     core.BuildStore
+	Cron       core.CronStore
+	Commits    core.CommitService
+	Events     core.Pubsub
+	Globals    core.GlobalSecretStore
+	Hooks      core.HookService
+	Logs       core.LogStore
+	License    *core.License
+	Licenses   core.LicenseService
+	Orgs       core.OrganizationService
+	Perms      core.PermStore
+	Repos      core.RepositoryStore
+	Repoz      core.RepositoryService
+	Scheduler  core.Scheduler
+	Secrets    core.SecretStore
+	Stages     core.StageStore
+	Steps      core.StepStore
+	Status     core.StatusService
+	Session    core.Session
+	Stream     core.LogStream
+	Syncer     core.Syncer
+	System     *core.System
+	Transferer core.Transferer
+	Triggerer  core.Triggerer
+	Users      core.UserStore
+	Userz      core.UserService
+	Webhook    core.WebhookSender
+	Private    bool
 }
 
 // Handler returns an http.Handler
@@ -154,105 +162,125 @@ func (s Server) Handler() http.Handler {
 	cors := cors.New(corsOpts)
 	r.Use(cors.Handler)
 
-	r.Route("/repos/{owner}/{name}", func(r chi.Router) {
-		r.Use(acl.InjectRepository(s.Repoz, s.Repos, s.Perms))
-		r.Use(acl.CheckReadAccess())
+	r.Route("/repos", func(r chi.Router) {
+		// temporary workaround to enable private mode
+		// for the drone server.
+		if os.Getenv("DRONE_SERVER_PRIVATE_MODE") == "true" {
+			r.Use(acl.AuthorizeUser)
+		}
 
-		r.Get("/", repos.HandleFind())
 		r.With(
-			acl.CheckAdminAccess(),
-		).Patch("/", repos.HandleUpdate(s.Repos))
-		r.With(
-			acl.CheckAdminAccess(),
-		).Post("/", repos.HandleEnable(s.Hooks, s.Repos, s.Webhook))
-		r.With(
-			acl.CheckAdminAccess(),
-		).Delete("/", repos.HandleDisable(s.Repos, s.Webhook))
-		r.With(
-			acl.CheckAdminAccess(),
-		).Post("/chown", repos.HandleChown(s.Repos))
-		r.With(
-			acl.CheckAdminAccess(),
-		).Post("/repair", repos.HandleRepair(s.Hooks, s.Repoz, s.Repos, s.Users, s.System.Link))
+			acl.AuthorizeAdmin,
+		).Get("/", repos.HandleAll(s.Repos))
 
-		r.Route("/builds", func(r chi.Router) {
-			r.Get("/", builds.HandleList(s.Repos, s.Builds))
-			r.With(acl.CheckWriteAccess()).Post("/", builds.HandleCreate(s.Repos, s.Commits, s.Triggerer))
+		r.Route("/{owner}/{name}", func(r chi.Router) {
+			r.Use(acl.InjectRepository(s.Repoz, s.Repos, s.Perms))
+			r.Use(acl.CheckReadAccess())
 
-			r.Get("/latest", builds.HandleLast(s.Repos, s.Builds, s.Stages))
-			r.Get("/{number}", builds.HandleFind(s.Repos, s.Builds, s.Stages))
-			r.Get("/{number}/logs/{stage}/{step}", logs.HandleFind(s.Repos, s.Builds, s.Stages, s.Steps, s.Logs))
-
-			r.With(
-				acl.CheckWriteAccess(),
-			).Post("/{number}", builds.HandleRetry(s.Repos, s.Builds, s.Triggerer))
-
-			r.With(
-				acl.CheckWriteAccess(),
-			).Delete("/{number}", builds.HandleCancel(s.Users, s.Repos, s.Builds, s.Stages, s.Steps, s.Status, s.Scheduler, s.Webhook))
-
-			r.With(
-				acl.CheckWriteAccess(),
-			).Post("/{number}/promote", builds.HandlePromote(s.Repos, s.Builds, s.Triggerer))
-
+			r.Get("/", repos.HandleFind())
 			r.With(
 				acl.CheckAdminAccess(),
-			).Post("/{number}/rollback", builds.HandleRollback(s.Repos, s.Builds, s.Triggerer))
-
+			).Patch("/", repos.HandleUpdate(s.Repos))
 			r.With(
 				acl.CheckAdminAccess(),
-			).Post("/{number}/decline/{stage}", stages.HandleDecline(s.Repos, s.Builds, s.Stages))
-
+			).Post("/", repos.HandleEnable(s.Hooks, s.Repos, s.Webhook))
 			r.With(
 				acl.CheckAdminAccess(),
-			).Post("/{number}/approve/{stage}", stages.HandleApprove(s.Repos, s.Builds, s.Stages, s.Scheduler))
-
+			).Delete("/", repos.HandleDisable(s.Repos, s.Webhook))
 			r.With(
 				acl.CheckAdminAccess(),
-			).Delete("/{number}/logs/{stage}/{step}", logs.HandleDelete(s.Repos, s.Builds, s.Stages, s.Steps, s.Logs))
-
+			).Post("/chown", repos.HandleChown(s.Repos))
 			r.With(
 				acl.CheckAdminAccess(),
-			).Delete("/", builds.HandlePurge(s.Repos, s.Builds))
+			).Post("/repair", repos.HandleRepair(s.Hooks, s.Repoz, s.Repos, s.Users, s.System.Link))
 
-		})
+			r.Route("/builds", func(r chi.Router) {
+				r.Get("/", builds.HandleList(s.Repos, s.Builds))
+				r.With(acl.CheckWriteAccess()).Post("/", builds.HandleCreate(s.Users, s.Repos, s.Commits, s.Triggerer))
 
-		r.Route("/secrets", func(r chi.Router) {
-			r.Use(acl.CheckWriteAccess())
-			r.Get("/", secrets.HandleList(s.Repos, s.Secrets))
-			r.Post("/", secrets.HandleCreate(s.Repos, s.Secrets))
-			r.Get("/{secret}", secrets.HandleFind(s.Repos, s.Secrets))
-			r.Patch("/{secret}", secrets.HandleUpdate(s.Repos, s.Secrets))
-			r.Delete("/{secret}", secrets.HandleDelete(s.Repos, s.Secrets))
-		})
+				r.Get("/branches", branches.HandleList(s.Repos, s.Builds))
+				r.With(acl.CheckWriteAccess()).Delete("/branches/*", branches.HandleDelete(s.Repos, s.Builds))
 
-		r.Route("/sign", func(r chi.Router) {
-			r.Use(acl.CheckWriteAccess())
-			r.Post("/", sign.HandleSign(s.Repos))
-		})
+				r.Get("/pulls", pulls.HandleList(s.Repos, s.Builds))
+				r.With(acl.CheckWriteAccess()).Delete("/pulls/{pull}", pulls.HandleDelete(s.Repos, s.Builds))
 
-		r.Route("/encrypt", func(r chi.Router) {
-			r.Use(acl.CheckWriteAccess())
-			r.Post("/", encrypt.Handler(s.Repos))
-			r.Post("/secret", encrypt.Handler(s.Repos))
-		})
+				r.Get("/deployments", deploys.HandleList(s.Repos, s.Builds))
+				r.With(acl.CheckWriteAccess()).Delete("/deployments/*", deploys.HandleDelete(s.Repos, s.Builds))
 
-		r.Route("/cron", func(r chi.Router) {
-			r.Use(acl.CheckWriteAccess())
-			r.Post("/", crons.HandleCreate(s.Repos, s.Cron))
-			r.Get("/", crons.HandleList(s.Repos, s.Cron))
-			r.Get("/{cron}", crons.HandleFind(s.Repos, s.Cron))
-			r.Post("/{cron}", crons.HandleExec(s.Users, s.Repos, s.Cron, s.Commits, s.Triggerer))
-			r.Patch("/{cron}", crons.HandleUpdate(s.Repos, s.Cron))
-			r.Delete("/{cron}", crons.HandleDelete(s.Repos, s.Cron))
-		})
+				r.Get("/latest", builds.HandleLast(s.Repos, s.Builds, s.Stages))
+				r.Get("/{number}", builds.HandleFind(s.Repos, s.Builds, s.Stages))
+				r.Get("/{number}/logs/{stage}/{step}", logs.HandleFind(s.Repos, s.Builds, s.Stages, s.Steps, s.Logs))
 
-		r.Route("/collaborators", func(r chi.Router) {
-			r.Get("/", collabs.HandleList(s.Repos, s.Perms))
-			r.Get("/{member}", collabs.HandleFind(s.Users, s.Repos, s.Perms))
-			r.With(
-				acl.CheckAdminAccess(),
-			).Delete("/{member}", collabs.HandleDelete(s.Users, s.Repos, s.Perms))
+				r.With(
+					acl.CheckWriteAccess(),
+				).Post("/{number}", builds.HandleRetry(s.Repos, s.Builds, s.Triggerer))
+
+				r.With(
+					acl.CheckWriteAccess(),
+				).Delete("/{number}", builds.HandleCancel(s.Users, s.Repos, s.Builds, s.Stages, s.Steps, s.Status, s.Scheduler, s.Webhook))
+
+				r.With(
+					acl.CheckWriteAccess(),
+				).Post("/{number}/promote", builds.HandlePromote(s.Repos, s.Builds, s.Triggerer))
+
+				r.With(
+					acl.CheckWriteAccess(),
+				).Post("/{number}/rollback", builds.HandleRollback(s.Repos, s.Builds, s.Triggerer))
+
+				r.With(
+					acl.CheckAdminAccess(),
+				).Post("/{number}/decline/{stage}", stages.HandleDecline(s.Repos, s.Builds, s.Stages))
+
+				r.With(
+					acl.CheckAdminAccess(),
+				).Post("/{number}/approve/{stage}", stages.HandleApprove(s.Repos, s.Builds, s.Stages, s.Scheduler))
+
+				r.With(
+					acl.CheckAdminAccess(),
+				).Delete("/{number}/logs/{stage}/{step}", logs.HandleDelete(s.Repos, s.Builds, s.Stages, s.Steps, s.Logs))
+
+				r.With(
+					acl.CheckAdminAccess(),
+				).Delete("/", builds.HandlePurge(s.Repos, s.Builds))
+			})
+
+			r.Route("/secrets", func(r chi.Router) {
+				r.Use(acl.CheckWriteAccess())
+				r.Get("/", secrets.HandleList(s.Repos, s.Secrets))
+				r.Post("/", secrets.HandleCreate(s.Repos, s.Secrets))
+				r.Get("/{secret}", secrets.HandleFind(s.Repos, s.Secrets))
+				r.Patch("/{secret}", secrets.HandleUpdate(s.Repos, s.Secrets))
+				r.Delete("/{secret}", secrets.HandleDelete(s.Repos, s.Secrets))
+			})
+
+			r.Route("/sign", func(r chi.Router) {
+				r.Use(acl.CheckWriteAccess())
+				r.Post("/", sign.HandleSign(s.Repos))
+			})
+
+			r.Route("/encrypt", func(r chi.Router) {
+				r.Use(acl.CheckWriteAccess())
+				r.Post("/", encrypt.Handler(s.Repos))
+				r.Post("/secret", encrypt.Handler(s.Repos))
+			})
+
+			r.Route("/cron", func(r chi.Router) {
+				r.Use(acl.CheckWriteAccess())
+				r.Post("/", crons.HandleCreate(s.Repos, s.Cron))
+				r.Get("/", crons.HandleList(s.Repos, s.Cron))
+				r.Get("/{cron}", crons.HandleFind(s.Repos, s.Cron))
+				r.Post("/{cron}", crons.HandleExec(s.Users, s.Repos, s.Cron, s.Commits, s.Triggerer))
+				r.Patch("/{cron}", crons.HandleUpdate(s.Repos, s.Cron))
+				r.Delete("/{cron}", crons.HandleDelete(s.Repos, s.Cron))
+			})
+
+			r.Route("/collaborators", func(r chi.Router) {
+				r.Get("/", collabs.HandleList(s.Repos, s.Perms))
+				r.Get("/{member}", collabs.HandleFind(s.Users, s.Repos, s.Perms))
+				r.With(
+					acl.CheckAdminAccess(),
+				).Delete("/{member}", collabs.HandleDelete(s.Users, s.Repos, s.Perms))
+			})
 		})
 	})
 
@@ -293,8 +321,9 @@ func (s Server) Handler() http.Handler {
 		r.Get("/", users.HandleList(s.Users))
 		r.Post("/", users.HandleCreate(s.Users, s.Userz, s.Webhook))
 		r.Get("/{user}", users.HandleFind(s.Users))
-		r.Patch("/{user}", users.HandleUpdate(s.Users))
-		r.Delete("/{user}", users.HandleDelete(s.Users, s.Webhook))
+		r.Patch("/{user}", users.HandleUpdate(s.Users, s.Transferer))
+		r.Delete("/{user}", users.HandleDelete(s.Users, s.Transferer, s.Webhook))
+		r.Get("/{user}/repos", users.HandleRepoList(s.Users, s.Repos))
 	})
 
 	r.Route("/stream", func(r chi.Router) {

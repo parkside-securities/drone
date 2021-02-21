@@ -13,5 +13,6 @@
 // limitations under the License.
 
 // +build !nolimit
+// +build !oss
 
 package license

@@ -46,6 +46,7 @@ type Build struct {
 	Cron         string            `db:"build_cron"           json:"cron,omitempty"`
 	Deploy       string            `db:"build_deploy"         json:"deploy_to,omitempty"`
 	DeployID     int64             `db:"build_deploy_id"      json:"deploy_id,omitempty"`
+	Debug        bool              `db:"build_debug"          json:"debug,omitempty"`
 	Started      int64             `db:"build_started"        json:"started"`
 	Finished     int64             `db:"build_finished"       json:"finished"`
 	Created      int64             `db:"build_created"        json:"created"`
@@ -71,6 +72,18 @@ type BuildStore interface {
 	// ListRef returns a list of builds from the datastore by ref.
 	ListRef(context.Context, int64, string, int, int) ([]*Build, error)
 
+	// LatestBranches returns the latest builds from the
+	// datastore by branch.
+	LatestBranches(context.Context, int64) ([]*Build, error)
+
+	// LatestPulls returns the latest builds from the
+	// datastore by pull requeset.
+	LatestPulls(context.Context, int64) ([]*Build, error)
+
+	// LatestDeploys returns the latest builds from the
+	// datastore by deployment target.
+	LatestDeploys(context.Context, int64) ([]*Build, error)
+
 	// Pending returns a list of pending builds from the
 	// datastore by repository id (DEPRECATED).
 	Pending(context.Context) ([]*Build, error)
@@ -88,9 +101,43 @@ type BuildStore interface {
 	// Delete deletes a build from the datastore.
 	Delete(context.Context, *Build) error
 
+	// DeletePull deletes a pull request index from the datastore.
+	DeletePull(context.Context, int64, int) error
+
+	// DeleteBranch deletes a branch index from the datastore.
+	DeleteBranch(context.Context, int64, string) error
+
+	// DeleteDeploy deletes a deploy index from the datastore.
+	DeleteDeploy(context.Context, int64, string) error
+
 	// Purge deletes builds from the database where the build number is less than n.
 	Purge(context.Context, int64, int64) error
 
 	// Count returns a count of builds.
 	Count(context.Context) (int64, error)
+}
+
+// IsDone returns true if the build has a completed state.
+func (b *Build) IsDone() bool {
+	switch b.Status {
+	case StatusWaiting,
+		StatusPending,
+		StatusRunning,
+		StatusBlocked:
+		return false
+	default:
+		return true
+	}
+}
+
+// IsFailed returns true if the build has failed
+func (b *Build) IsFailed() bool {
+	switch b.Status {
+	case StatusFailing,
+		StatusKilled,
+		StatusError:
+		return true
+	default:
+		return false
+	}
 }

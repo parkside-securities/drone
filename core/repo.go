@@ -54,6 +54,7 @@ type (
 		CancelPulls bool   `json:"auto_cancel_pull_requests"`
 		CancelPush  bool   `json:"auto_cancel_pushes"`
 		Timeout     int64  `json:"timeout"`
+		Throttle    int64  `json:"throttle,omitempty"`
 		Counter     int64  `json:"counter"`
 		Synced      int64  `json:"synced"`
 		Created     int64  `json:"created"`
@@ -81,6 +82,10 @@ type (
 		// ListIncomplete returns a non-unique repository list form
 		// the datastore with incomplete builds.
 		ListIncomplete(context.Context) ([]*Repository, error)
+
+		// ListAll returns a paginated list of all repositories
+		// stored in the database, including disabled repositories.
+		ListAll(ctx context.Context, limit, offset int) ([]*Repository, error)
 
 		// Find returns a repository from the datastore.
 		Find(context.Context, int64) (*Repository, error)

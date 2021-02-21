@@ -20,6 +20,7 @@ import (
 	"github.com/drone/drone/plugin/admission"
 	"github.com/drone/drone/plugin/config"
 	"github.com/drone/drone/plugin/converter"
+	"github.com/drone/drone/plugin/converter/starlark"
 	"github.com/drone/drone/plugin/registry"
 	"github.com/drone/drone/plugin/secret"
 	"github.com/drone/drone/plugin/validator"
@@ -61,10 +62,13 @@ func provideAdmissionPlugin(client *scm.Client, orgs core.OrganizationService, u
 // configuration.
 func provideConfigPlugin(client *scm.Client, contents core.FileService, conf spec.Config) core.ConfigService {
 	return config.Combine(
-		config.Global(
-			conf.Yaml.Endpoint,
-			conf.Yaml.Secret,
-			conf.Yaml.SkipVerify,
+		config.Memoize(
+			config.Global(
+				conf.Yaml.Endpoint,
+				conf.Yaml.Secret,
+				conf.Yaml.SkipVerify,
+				conf.Yaml.Timeout,
+			),
 		),
 		config.Repository(contents),
 	)
@@ -76,7 +80,9 @@ func provideConfigPlugin(client *scm.Client, contents core.FileService, conf spe
 func provideConvertPlugin(client *scm.Client, conf spec.Config) core.ConvertService {
 	return converter.Combine(
 		converter.Legacy(false),
-		converter.Starlark(false),
+		starlark.New(
+			conf.Starlark.Enabled,
+		),
 		converter.Jsonnet(
 			conf.Jsonnet.Enabled,
 		),
@@ -86,6 +92,7 @@ func provideConvertPlugin(client *scm.Client, conf spec.Config) core.ConvertServ
 				conf.Convert.Secret,
 				conf.Convert.Extension,
 				conf.Convert.SkipVerify,
+				conf.Convert.Timeout,
 			),
 		),
 	)
@@ -131,6 +138,13 @@ func provideValidatePlugin(conf spec.Config) core.ValidateService {
 			conf.Validate.Endpoint,
 			conf.Validate.Secret,
 			conf.Validate.SkipVerify,
+			conf.Validate.Timeout,
+		),
+		// THIS FEATURE IS INTERNAL USE ONLY AND SHOULD
+		// NOT BE USED OR RELIED UPON IN PRODUCTION.
+		validator.Filter(
+			nil,
+			conf.Repository.Ignore,
 		),
 	)
 }

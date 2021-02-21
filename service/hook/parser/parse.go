@@ -89,7 +89,11 @@ func (p *parser) Parse(req *http.Request, secretFunc func(string) string) (*core
 	// payload signature for authenticity.
 	fn := func(webhook scm.Webhook) (string, error) {
 		if webhook == nil {
-			return "", errors.New("Invalid or malformed webhook")
+			// HACK(bradrydzewski) if the incoming webhook is nil
+			// we assume it is an unknown event or action. A more
+			// permanent fix is to update go-scm to return an
+			// scm.ErrUnknownAction error.
+			return "", scm.ErrUnknownEvent
 		}
 		repo := webhook.Repository()
 		slug := scm.Join(repo.Namespace, repo.Name)
@@ -232,6 +236,23 @@ func (p *parser) Parse(req *http.Request, secretFunc func(string) string) (*core
 		}
 		return hook, repo, nil
 	case *scm.PullRequestHook:
+
+		// TODO(bradrydzewski) cleanup the pr close hook code.
+		if v.Action == scm.ActionClose {
+			return &core.Hook{
+					Trigger: core.TriggerHook,
+					Event:   core.EventPullRequest,
+					Action:  core.ActionClose,
+					After:   v.PullRequest.Sha,
+					Ref:     v.PullRequest.Ref,
+				}, &core.Repository{
+					UID:       v.Repo.ID,
+					Namespace: v.Repo.Namespace,
+					Name:      v.Repo.Name,
+					Slug:      scm.Join(v.Repo.Namespace, v.Repo.Name),
+				}, nil
+		}
+
 		if v.Action != scm.ActionOpen && v.Action != scm.ActionSync {
 			return nil, nil, nil
 		}
@@ -284,6 +305,23 @@ func (p *parser) Parse(req *http.Request, secretFunc func(string) string) (*core
 		}
 		return hook, repo, nil
 	case *scm.BranchHook:
+
+		// TODO(bradrydzewski) cleanup the branch hook code.
+		if v.Action == scm.ActionDelete {
+			return &core.Hook{
+					Trigger: core.TriggerHook,
+					Event:   core.EventPush,
+					After:   v.Ref.Sha,
+					Action:  core.ActionDelete,
+					Target:  scm.TrimRef(v.Ref.Name),
+				}, &core.Repository{
+					UID:       v.Repo.ID,
+					Namespace: v.Repo.Namespace,
+					Name:      v.Repo.Name,
+					Slug:      scm.Join(v.Repo.Namespace, v.Repo.Name),
+				}, nil
+		}
+
 		if v.Action != scm.ActionCreate {
 			return nil, nil, nil
 		}
@@ -364,5 +402,5 @@ func toMap(src interface{}) map[string]string {
 	for k, v := range set {
 		dst[k] = fmt.Sprint(v)
 	}
-	return nil
+	return dst
 }

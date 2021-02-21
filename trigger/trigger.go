@@ -186,6 +186,7 @@ func (t *triggerer) Trigger(ctx context.Context, repo *core.Repository, base *co
 		Cron:         base.Cron,
 		Deploy:       base.Deployment,
 		DeployID:     base.DeploymentID,
+		Debug:        base.Debug,
 		Sender:       base.Sender,
 		Created:      time.Now().Unix(),
 		Updated:      time.Now().Unix(),
@@ -234,16 +235,24 @@ func (t *triggerer) Trigger(ctx context.Context, repo *core.Repository, base *co
 		return t.createBuildError(ctx, repo, base, err.Error())
 	}
 
-	err = t.validate.Validate(ctx, &core.ValidateArgs{
+	verr := t.validate.Validate(ctx, &core.ValidateArgs{
 		User:   user,
 		Repo:   repo,
 		Build:  tmpBuild,
 		Config: raw,
 	})
-	if err != nil {
-		logger = logger.WithError(err)
-		logger.Warnln("trigger: yaml validation error")
-		return t.createBuildError(ctx, repo, base, err.Error())
+	switch verr {
+	case core.ErrValidatorBlock:
+		logger.Debugln("trigger: yaml validation error: block pipeline")
+	case core.ErrValidatorSkip:
+		logger.Debugln("trigger: yaml validation error: skip pipeline")
+		return nil, nil
+	default:
+		if verr != nil {
+			logger = logger.WithError(err)
+			logger.Warnln("trigger: yaml validation error")
+			return t.createBuildError(ctx, repo, base, verr.Error())
+		}
 	}
 
 	err = linter.Manifest(manifest, repo.Trusted)
@@ -258,6 +267,12 @@ func (t *triggerer) Trigger(ctx context.Context, repo *core.Repository, base *co
 		key := signer.KeyString(repo.Secret)
 		val := []byte(raw.Data)
 		verified, _ = signer.Verify(val, key)
+	}
+	// if pipeline validation failed with a block error, the
+	// pipeline verification should be set to false, which will
+	// force manual review and approval.
+	if verr == core.ErrValidatorBlock {
+		verified = false
 	}
 
 	// var paths []string
@@ -353,6 +368,7 @@ func (t *triggerer) Trigger(ctx context.Context, repo *core.Repository, base *co
 		Params:       base.Params,
 		Deploy:       base.Deployment,
 		DeployID:     base.DeploymentID,
+		Debug:        base.Debug,
 		Sender:       base.Sender,
 		Cron:         base.Cron,
 		Created:      time.Now().Unix(),
@@ -378,6 +394,7 @@ func (t *triggerer) Trigger(ctx context.Context, repo *core.Repository, base *co
 			Variant:   match.Platform.Variant,
 			Kernel:    match.Platform.Version,
 			Limit:     match.Concurrency.Limit,
+			LimitRepo: int(repo.Throttle),
 			Status:    core.StatusWaiting,
 			DependsOn: match.DependsOn,
 			OnSuccess: onSuccess,
@@ -410,7 +427,7 @@ func (t *triggerer) Trigger(ctx context.Context, repo *core.Repository, base *co
 	for _, stage := range stages {
 		// here we re-work the dependencies for the stage to
 		// account for the fact that some steps may be skipped
-		// and may otherwise break the dependnecy chain.
+		// and may otherwise break the dependency chain.
 		stage.DependsOn = dag.Dependencies(stage.Name)
 
 		// if the stage is pending dependencies, but those
@@ -527,6 +544,7 @@ func (t *triggerer) createBuildError(ctx context.Context, repo *core.Repository,
 		AuthorAvatar: base.AuthorAvatar,
 		Deploy:       base.Deployment,
 		DeployID:     base.DeploymentID,
+		Debug:        base.Debug,
 		Sender:       base.Sender,
 		Created:      time.Now().Unix(),
 		Updated:      time.Now().Unix(),

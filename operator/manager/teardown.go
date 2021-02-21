@@ -37,6 +37,7 @@ type teardown struct {
 	Status    core.StatusService
 	Stages    core.StageStore
 	Users     core.UserStore
+	Webhook   core.WebhookSender
 }
 
 func (t *teardown) do(ctx context.Context, stage *core.Stage) error {
@@ -64,6 +65,9 @@ func (t *teardown) do(ctx context.Context, stage *core.Stage) error {
 	}
 
 	for _, step := range stage.Steps {
+		if len(step.Error) > 500 {
+			step.Error = step.Error[:500]
+		}
 		err := t.Steps.Update(noContext, step)
 		if err != nil {
 			logger.WithError(err).
@@ -73,6 +77,10 @@ func (t *teardown) do(ctx context.Context, stage *core.Stage) error {
 				Warnln("manager: cannot persist the step")
 			return err
 		}
+	}
+
+	if len(stage.Error) > 500 {
+		stage.Error = stage.Error[:500]
 	}
 
 	stage.Updated = time.Now().Unix()
@@ -165,6 +173,17 @@ func (t *teardown) do(ctx context.Context, stage *core.Stage) error {
 	if err != nil {
 		logger.WithError(err).
 			Warnln("manager: cannot publish build event")
+	}
+
+	payload := &core.WebhookData{
+		Event:  core.WebhookEventBuild,
+		Action: core.WebhookActionUpdated,
+		Repo:   repo,
+		Build:  build,
+	}
+	err = t.Webhook.Send(noContext, payload)
+	if err != nil {
+		logger.WithError(err).Warnln("manager: cannot send global webhook")
 	}
 
 	user, err := t.Users.Find(noContext, repo.UserID)
